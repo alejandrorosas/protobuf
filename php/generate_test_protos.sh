@@ -26,6 +26,9 @@ mkdir -p php/tmp
 
 find php/tests/proto -type f -name "*.proto"| xargs $PROTOC --php_out=php/tmp -Isrc -Iphp/tests
 
+JSON_OPTIONS_FILES="src/google/protobuf/json_options.proto src/google/protobuf/json_enumvalue_options.proto"
+$PROTOC --php_out=php/tmp -Isrc -Iphp/tests $JSON_OPTIONS_FILES
+
 if [ "$1" = "--aggregate_metadata" ]; then
   # Overwrite some of the files to use aggregation.
   AGGREGATED_FILES="tests/proto/test.proto tests/proto/test_include.proto tests/proto/test_import_descriptor_proto.proto"

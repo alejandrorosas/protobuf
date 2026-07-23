@@ -197,20 +197,81 @@ TEST_F(PhpGeneratorTest, UnicodePhpNamespaceAccepted) {
   ExpectNoErrors();
 }
 
-// TODO Remove this test once full Edition 2026 support is in PHP
-TEST_F(PhpGeneratorTest, Edition2026Fails) {
+TEST_F(PhpGeneratorTest, CustomEnumNames) {
+#ifdef PROTO2_OPENSOURCE
+  CreateTempFile("google/protobuf/json_enumvalue_options.proto",
+                 R"schema(
+    edition = "2024";
+    package pb.enumvalue;
+    import "google/protobuf/descriptor.proto";
+    message JsonEnumValueOptions {
+      string string = 1;
+    }
+    extend google.protobuf.EnumValueOptions {
+      JsonEnumValueOptions json = 998;
+    }
+  )schema");
+
   CreateTempFile("foo.proto",
                  R"schema(
     edition = "2026";
-    enum Foo {
-      BAR = 0;
-    })schema");
+    package foo;
+    import "google/protobuf/json_enumvalue_options.proto";
+    enum MyEnum {
+      MY_ENUM_UNKNOWN = 0;
+      MY_ENUM_BAR = 1 [(pb.enumvalue.json).string = "custom_bar"];
+      MY_ENUM_BAZ = 2;
+    }
+  )schema");
+#else
+  CreateTempFile("google/protobuf/json_enumvalue_options.proto",
+                 R"schema(
+    edition = "2024";
+    package pb.enumvalue;
+    import "google/protobuf/descriptor.proto";
+    message JsonEnumValueOptions {
+      string string = 1;
+    }
+    extend google.protobuf.EnumValueOptions {
+      JsonEnumValueOptions json = 998;
+    }
+  )schema");
+
+  CreateTempFile("foo.proto",
+                 R"schema(
+    edition = "2026";
+    package foo;
+    import "google/protobuf/json_enumvalue_options.proto";
+    enum MyEnum {
+      MY_ENUM_UNKNOWN = 0;
+      MY_ENUM_BAR = 1 [(pb.enumvalue.json).string = "custom_bar"];
+      MY_ENUM_BAZ = 2;
+    }
+  )schema");
+#endif
 
   RunProtoc(
       "protocol_compiler --proto_path=$tmpdir --php_out=$tmpdir foo.proto");
 
-  ExpectErrorSubstring(
-      "PHP does not yet fully support Edition 2026, but is coming soon.");
+  ExpectNoErrors();
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php",
+      "private static $valueToCustomName = [\n"
+      "        self::MY_ENUM_BAR => \"custom_bar\",\n"
+      "    ];");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php",
+      "private static $customNameToValue = [\n"
+      "        \"custom_bar\" => self::MY_ENUM_BAR,\n"
+      "    ];");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php", "public static function customName($value)");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php", "public static function customValue($name)");
 }
 
 }  // namespace

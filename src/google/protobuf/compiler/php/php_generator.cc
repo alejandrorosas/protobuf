@@ -29,9 +29,11 @@
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/printer.h"
 #include "google/protobuf/io/zero_copy_stream.h"
+#include "google/protobuf/json_enumvalue_options.pb.h"
 
 constexpr absl::string_view kDescriptorFile =
     "google/protobuf/descriptor.proto";
+
 constexpr absl::string_view kEmptyFile = "google/protobuf/empty.proto";
 constexpr absl::string_view kEmptyMetadataFile =
     "GPBMetadata/Google/Protobuf/GPBEmpty.php";
@@ -1431,6 +1433,67 @@ bool GenerateEnumFile(const FileDescriptor* file, const EnumDescriptor* en,
   Outdent(&printer);
   printer.Print("}\n");
 
+  // Generate $valueToCustomName map if there are any custom names
+  bool has_custom_names = false;
+  for (int i = 0; i < en->value_count(); i++) {
+    const EnumValueDescriptor* value = en->value(i);
+    if (value->options().HasExtension(pb::enumvalue::json)) {
+      has_custom_names = true;
+      break;
+    }
+  }
+
+  if (has_custom_names) {
+    printer.Print("\nprivate static $valueToCustomName = [\n");
+    Indent(&printer);
+    for (int i = 0; i < en->value_count(); i++) {
+      const EnumValueDescriptor* value = en->value(i);
+      if (value->options().HasExtension(pb::enumvalue::json)) {
+        absl::string_view custom_name =
+            value->options().GetExtension(pb::enumvalue::json).string();
+        std::string php_str = absl::CEscape(custom_name);
+        absl::StrReplaceAll({{"$", "\\$"}}, &php_str);
+
+        printer.Print(
+            "self::^constant^ => \"^name^\",\n", "constant",
+            absl::StrCat(ConstantNamePrefix(value->name()), value->name()),
+            "name", php_str);
+      }
+    }
+    Outdent(&printer);
+    printer.Print("];\n");
+
+    printer.Print("\nprivate static $customNameToValue = [\n");
+    Indent(&printer);
+    for (int i = 0; i < en->value_count(); i++) {
+      const EnumValueDescriptor* value = en->value(i);
+      if (value->options().HasExtension(pb::enumvalue::json)) {
+        absl::string_view custom_name =
+            value->options().GetExtension(pb::enumvalue::json).string();
+        std::string php_str = absl::CEscape(custom_name);
+        absl::StrReplaceAll({{"$", "\\$"}}, &php_str);
+
+        printer.Print(
+            "\"^name^\" => self::^constant^,\n", "name", php_str, "constant",
+            absl::StrCat(ConstantNamePrefix(value->name()), value->name()));
+      }
+    }
+    Outdent(&printer);
+    printer.Print("];\n");
+
+    printer.Print(
+        "\npublic static function customName($value)\n"
+        "{\n"
+        "    return isset(self::$valueToCustomName[$value])\n"
+        "        ? self::$valueToCustomName[$value] : null;\n"
+        "}\n"
+        "\npublic static function customValue($name)\n"
+        "{\n"
+        "    return isset(self::$customNameToValue[$name])\n"
+        "        ? self::$customNameToValue[$name] : null;\n"
+        "}\n");
+  }
+
   Outdent(&printer);
   printer.Print("}\n\n");
 
@@ -2242,12 +2305,6 @@ bool Generator::Generate(const FileDescriptor* file, const Options& options,
   if (options.is_descriptor && file->name() != kDescriptorFile) {
     *error =
         "Can only generate PHP code for google/protobuf/descriptor.proto.\n";
-    return false;
-  }
-  // TODO Remove once full Edition 2026 support is in PHP
-  if (GetEdition(*file) >= Edition::EDITION_2026) {
-    *error =
-        "PHP does not yet fully support Edition 2026, but is coming soon.\n";
     return false;
   }
 
