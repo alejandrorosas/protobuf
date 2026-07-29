@@ -38,9 +38,25 @@ rust_library(
         "//conditions:default": ["--cfg=cpp_kernel"],
     }),
     visibility = ["//visibility:public"],
+    deps = [":protobuf_lite"],
+)
+
+rust_library(
+    name = "protobuf_lite",
+    srcs = ["protobuf_lite.rs"],
+    aliases = select({
+        ":use_upb_kernel": {"//rust:protobuf_upb_lite": "protobuf_upb"},
+        "//conditions:default": {"//rust:protobuf_cpp_lite": "protobuf_cpp"},
+    }),
+    edition = "2024",
+    rustc_flags = select({
+        ":use_upb_kernel": ["--cfg=upb_kernel"],
+        "//conditions:default": ["--cfg=cpp_kernel"],
+    }),
+    visibility = ["//visibility:public"],
     deps = select({
-        ":use_upb_kernel": [":protobuf_upb"],
-        "//conditions:default": [":protobuf_cpp"],
+        ":use_upb_kernel": [":protobuf_upb_lite"],
+        "//conditions:default": [":protobuf_cpp_lite"],
     }),
 )
 
@@ -83,6 +99,9 @@ ALL_RUST_SRCS = PROTOBUF_SHARED + [
     "gtest_matchers.rs",
     "gtest_matchers_impl.rs",
     "protobuf.rs",
+    "protobuf_cpp.rs",
+    "protobuf_lite.rs",
+    "protobuf_upb.rs",
     "upb_kernel/conversions.rs",
     "upb_kernel/extension.rs",
     "upb_kernel/interop.rs",
@@ -101,7 +120,7 @@ ALL_RUST_SRCS = PROTOBUF_SHARED + [
 # `:rust_proto_library_kernel` build setting; it has to be fully functional under any value of that
 # setting.
 rust_library(
-    name = "protobuf_upb",
+    name = "protobuf_upb_lite",
     srcs = PROTOBUF_SHARED + [
         "upb_kernel/conversions.rs",
         "upb_kernel/extension.rs",
@@ -130,9 +149,21 @@ rust_library(
     ],
 )
 
+rust_library(
+    name = "protobuf_upb",
+    srcs = ["protobuf_upb.rs"],
+    edition = "2024",
+    rustc_flags = [
+        "--cfg=upb_kernel",
+        "--cfg=bzl",
+    ],
+    visibility = [":protobuf_internal"],
+    deps = [":protobuf_upb_lite"],
+)
+
 rust_test(
-    name = "protobuf_upb_test",
-    crate = ":protobuf_upb",
+    name = "protobuf_upb_lite_test",
+    crate = ":protobuf_upb_lite",
     edition = "2024",
     rustc_flags = [
         "--cfg=upb_kernel",
@@ -148,11 +179,12 @@ rust_test(
 rust_library(
     name = "protobuf_upb_export",
     testonly = True,
-    srcs = ["protobuf.rs"],
+    srcs = ["protobuf_lite.rs"],
+    aliases = {"//rust:protobuf_upb_lite": "protobuf_upb"},
     edition = "2024",
     rustc_flags = ["--cfg=upb_kernel"],
     visibility = [":protobuf_internal"],
-    deps = [":protobuf_upb"],
+    deps = [":protobuf_upb_lite"],
 )
 
 # The Rust Protobuf runtime using the cpp kernel.
@@ -161,7 +193,7 @@ rust_library(
 # `:rust_proto_library_kernel` build setting; it has to be fully functional under any value of that
 # setting.
 rust_library(
-    name = "protobuf_cpp",
+    name = "protobuf_cpp_lite",
     srcs = PROTOBUF_SHARED + [
         "cpp_kernel/extension.rs",
         "cpp_kernel/interop.rs",
@@ -188,9 +220,21 @@ rust_library(
     ],
 )
 
+rust_library(
+    name = "protobuf_cpp",
+    srcs = ["protobuf_cpp.rs"],
+    edition = "2024",
+    rustc_flags = [
+        "--cfg=cpp_kernel",
+        "--cfg=bzl",
+    ],
+    visibility = [":protobuf_internal"],
+    deps = [":protobuf_cpp_lite"],
+)
+
 rust_test(
-    name = "protobuf_cpp_test",
-    crate = ":protobuf_cpp",
+    name = "protobuf_cpp_lite_test",
+    crate = ":protobuf_cpp_lite",
     edition = "2024",
     rustc_flags = [
         "--cfg=cpp_kernel",
@@ -206,11 +250,24 @@ rust_test(
 rust_library(
     name = "protobuf_cpp_export",
     testonly = True,
-    srcs = ["protobuf.rs"],
+    srcs = ["protobuf_lite.rs"],
+    aliases = {"//rust:protobuf_cpp_lite": "protobuf_cpp"},
     edition = "2024",
     rustc_flags = ["--cfg=cpp_kernel"],
     visibility = [":protobuf_internal"],
-    deps = [":protobuf_cpp"],
+    deps = [":protobuf_cpp_lite"],
+)
+
+alias(
+    name = "protobuf_cpp_runtime_selector",
+    actual = ":protobuf_cpp_lite",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "protobuf_upb_runtime_selector",
+    actual = ":protobuf_upb_lite",
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -310,7 +367,7 @@ proto_lang_toolchain(
     plugin = "//src/google/protobuf/compiler/rust:protoc-gen-rust",
     plugin_format_flag = "--plugin=protoc-gen-rust=%s",
     progress_message = "Generating Rust proto_library %{label}",
-    runtime = ":protobuf_upb",
+    runtime = ":protobuf_upb_runtime_selector",
     visibility = ["//visibility:public"],
 )
 
@@ -321,7 +378,7 @@ proto_lang_toolchain(
     plugin = "//src/google/protobuf/compiler/rust:protoc-gen-rust",
     plugin_format_flag = "--plugin=protoc-gen-rust=%s",
     progress_message = "Generating Rust proto_library %{label}",
-    runtime = ":protobuf_cpp",
+    runtime = ":protobuf_cpp_runtime_selector",
     visibility = ["//visibility:public"],
 )
 

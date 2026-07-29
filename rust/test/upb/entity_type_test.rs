@@ -14,22 +14,22 @@ use unittest_rust_proto::{TestAllTypes, TestAllTypesMut, TestAllTypesView};
 fn test_type_tags() {
     assert_that!(
         std::any::type_name::<<TestAllTypes as EntityType>::Tag>(),
-        eq("protobuf_upb::codegen_traits::entity_tag::MessageTag")
+        eq("protobuf_upb_lite::codegen_traits::entity_tag::MessageTag")
     );
     assert_that!(
         std::any::type_name::<<TestAllTypesView as EntityType>::Tag>(),
-        eq("protobuf_upb::codegen_traits::entity_tag::ViewProxyTag")
+        eq("protobuf_upb_lite::codegen_traits::entity_tag::ViewProxyTag")
     );
     assert_that!(
         std::any::type_name::<<TestAllTypesMut as EntityType>::Tag>(),
-        eq("protobuf_upb::codegen_traits::entity_tag::MutProxyTag")
+        eq("protobuf_upb_lite::codegen_traits::entity_tag::MutProxyTag")
     );
     assert_that!(
         std::any::type_name::<<NestedEnum as EntityType>::Tag>(),
-        eq("protobuf_upb::codegen_traits::entity_tag::EnumTag")
+        eq("protobuf_upb_lite::codegen_traits::entity_tag::EnumTag")
     );
     assert_that!(
         std::any::type_name::<<i32 as EntityType>::Tag>(),
-        eq("protobuf_upb::codegen_traits::entity_tag::PrimitiveTag")
+        eq("protobuf_upb_lite::codegen_traits::entity_tag::PrimitiveTag")
     );
 }
